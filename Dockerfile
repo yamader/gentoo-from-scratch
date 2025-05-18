@@ -64,31 +64,65 @@ RUN <<-EOS
 	tar xJf stage3.txz -C /stage3
 EOS
 
-FROM scratch AS catalyst
+FROM scratch AS catalyst-base
 COPY --from=stage3-dl /stage3 /
-COPY --from=stage3-dl /stage3.txz /var/tmp/catalyst/builds/
+COPY --from=stage3-dl /stage3.txz /var/tmp/catalyst/builds/seed/
 RUN <<-EOS
 	emerge-webrsync
 	emerge --autounmask --autounmask-continue dev-util/catalyst
 EOS
+RUN <<-EOS
+	cat >> /etc/catalyst/catalyst.conf <<-EOF
+		jobs = $(nproc)
+		load-average = $(nproc)
+		var_tmpfs_portage = 16
+	EOF
+EOS
 ENTRYPOINT ["bash"]
 
-FROM catalyst
-ARG GENTOO_RELENG_COMMIT=c622211a2f847d473199e597d95eaf55cbbe40b2
+FROM catalyst-base AS catalyst
 RUN --security=insecure <<-EOS
-	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_COMMIT.tar.gz | tar xz
-	SPECS=(releng-$GENTOO_RELENG_COMMIT/releases/specs/amd64/stage?-openrc-23.spec)
-
 	catalyst -s stable
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
 
+	# seed stage4 for llvm
+	cat > stage4-llvm-seed.spec <<-EOF
+		subarch: amd64
+		version_stamp: llvm
+		target: stage4
+		rel_type: seed
+		source_subpath: seed/stage3
+		profile: default/linux/amd64/23.0
+		snapshot_treeish: $TREEISH
+		stage4/packages:
+		  llvm-core/clang
+		  llvm-core/lld
+		  llvm-core/llvm
+		  llvm-runtimes/compiler-rt
+		  llvm-runtimes/libcxx
+		  llvm-runtimes/libcxxabi
+		  llvm-runtimes/libunwind
+	EOF
+	catalyst -f stage4-llvm-seed.spec
+EOS
+
+ARG GENTOO_RELENG_COMMIT=c622211a2f847d473199e597d95eaf55cbbe40b2
+RUN --security=insecure <<-EOS
+	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
+
+	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_COMMIT.tar.gz | tar xz
+	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_COMMIT
+	SPECS=($REPO_DIR/releases/specs/amd64/llvm/stage?-openrc-23.spec)
 	sed -i "
-		s|@REPO_DIR@|$(pwd)|g
+		s|@REPO_DIR@|$REPO_DIR|g
+		s|@TIMESTAMP@|$(date -u +%Y%m%dT%H%M%SZ)|g
 		s|@TREEISH@|$TREEISH|g
 	" ${SPECS[@]}
-	sed -i '/source/c\source_subpath: stage3.txz' $SPECS
-
+	sed -i '/source/c\source_subpath: seed/stage4-amd64-llvm' $SPECS
 	for i in ${SPECS[@]}; do
 		catalyst -f $i
 	done
 EOS
+
+FROM scratch
+COPY --from=catalyst /var/tmp/catalyst/builds /

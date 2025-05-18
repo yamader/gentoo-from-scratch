@@ -6,7 +6,7 @@
     --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1,env.BUILDKIT_STEP_LOG_MAX_SPEED=-1 \
     --name gentoo-builder \
     --use
-% docker buildx build --build-arg FULL_BOOTSTRAP=1 -o dist .
+% docker buildx build --allow security.insecure --build-arg FULL_BOOTSTRAP=1 -o dist .
 ```
 
 ## debug
