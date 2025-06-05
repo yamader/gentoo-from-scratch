@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1-labs
 
 FROM alpine AS guix-base
-ARG GUIX_COMMIT=455805beda4417b329f26522fde4f0a88c2e211e # latest gnu/packages/commencement.scm
+ARG GUIX_COMMIT=57ea6d3d593f483f50fd410478f9b645bbd72b45 # latest gnu/packages/commencement.scm
 RUN <<-EOS
 	apk add guix
 	# update guix
 	apk add autoconf automake gcc gettext-dev git guile-dev guix libc-dev make
-	wget -O- https://codeberg.org/guix/guix-mirror/archive/$GUIX_COMMIT.tar.gz | tar xz
-	cd guix-mirror
+	wget -O- https://codeberg.org/guix/guix/archive/$GUIX_COMMIT.tar.gz | tar xz
+	cd guix
 	truncate -s0 doc/local.mk
 	./bootstrap
 	./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --disable-daemon
