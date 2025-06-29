@@ -14,6 +14,7 @@ RUN <<-EOS
 	git submodule update --init --recursive
 
 	{
+		# todo: ええ感じにする
 		mkdir -p distfiles
 		wget -P distfiles \
 			https://files.bootstrapping.world/coreutils-9.4.tar.xz \
@@ -269,7 +270,7 @@ RUN emerge -j --autounmask --autounmask-continue dev-util/catalyst
 COPY --from=gentoo-gnu-tarball /gentoo-gnu.txz /var/tmp/catalyst/builds/seed/
 
 FROM catalyst-base-gnu AS catalyst-gnu
-ARG GENTOO_RELENG_COMMIT=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
+ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
 RUN --security=insecure <<-EOS
 	cat >> /etc/catalyst/catalyst.conf <<-EOF
 		jobs = $(nproc)
@@ -280,8 +281,8 @@ RUN --security=insecure <<-EOS
 	catalyst -s stable
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
 
-	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_COMMIT.tar.gz | tar xz
-	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_COMMIT
+	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_TREEISH.tar.gz | tar xz
+	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_TREEISH
 	SPECS=($REPO_DIR/releases/specs/amd64/llvm/stage?-openrc-23.spec)
 
 	sed -i '/source/c\source_subpath: seed/gentoo-gnu' $SPECS
@@ -466,7 +467,7 @@ FROM gentoo-musl AS catalyst-musl
 RUN emerge -j --autounmask --autounmask-continue dev-util/catalyst
 COPY --from=gentoo-musl-llvm-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/seed/
 
-ARG GENTOO_RELENG_COMMIT=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
+ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
 RUN --security=insecure <<-EOS
 	cat >> /etc/catalyst/catalyst.conf <<-EOF
 		jobs = $(nproc)
@@ -477,8 +478,8 @@ RUN --security=insecure <<-EOS
 	catalyst -s stable
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
 
-	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_COMMIT.tar.gz | tar xz
-	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_COMMIT
+	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_TREEISH.tar.gz | tar xz
+	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_TREEISH
 	SPECS=($REPO_DIR/releases/specs/amd64/musl-llvm/stage?-23.spec)
 
 	sed -i '/source/c\source_subpath: seed/gentoo-musl' $SPECS
