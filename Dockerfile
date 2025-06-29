@@ -65,6 +65,8 @@ RUN <<-EOS
 	ls /rootfs > /rootfs/srcs
 	cat >> /rootfs/srcs <<-EOF
 		configurator
+		hex0
+		kaem
 		preseed-jump.kaem
 		script-generator
 		seed-full.kaem
@@ -73,8 +75,12 @@ EOS
 
 FROM scratch AS live-bootstrap
 COPY --from=live-bootstrap-src /rootfs /
-RUN ["/bootstrap-seeds/POSIX/x86/kaem-optional-seed"]
-ENTRYPOINT ["bash"]
+# from 181 bytes hex0-seed
+# cf. https://github.com/oriansj/bootstrap-seeds/tree/cedec6b8066d1db229b6c77d42d120a23c6980ed/POSIX/x86
+RUN ["/bootstrap-seeds/POSIX/x86/hex0-seed", "/bootstrap-seeds/POSIX/x86/hex0_x86.hex0", "/hex0"]
+RUN ["/hex0", "/bootstrap-seeds/POSIX/x86/kaem-minimal.hex0", "/kaem"]
+RUN ["/kaem"]
+ENTRYPOINT ["/bin/bash"]
 
 #-------------------------------------------------------------------------------------------------------------------------------
 # GNU
