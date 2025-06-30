@@ -9,3 +9,27 @@
 % docker buildx build --allow security.insecure --progress plain -o dist --target target-gnu .
 % docker buildx build --allow security.insecure --progress plain -o dist --target target-musl .
 ```
+
+## Rust
+
+そのうち自動化する
+
+```sh
+USE=mrustc-bootstrap CC=gcc LDFLAGS=-fuse-ld=lld emerge -1 dev-lang/rust:1.74.1
+```
+
+`dev-lang/rust:1.74.1`に当てるpatch💩
+
+```diff
+--- a/src/llvm-project/llvm/tools/sancov/sancov.cpp
++++ b/src/llvm-project/llvm/tools/sancov/sancov.cpp
+@@ -505,7 +505,7 @@
+   static std::unique_ptr<SpecialCaseList> createUserIgnorelist() {
+     if (ClIgnorelist.empty())
+       return std::unique_ptr<SpecialCaseList>();
+-    return SpecialCaseList::createOrDie({{ClIgnorelist}},
++    return SpecialCaseList::createOrDie({ClIgnorelist},
+                                         *vfs::getRealFileSystem());
+   }
+   std::unique_ptr<SpecialCaseList> DefaultIgnorelist;
+```
