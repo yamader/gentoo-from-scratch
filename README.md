@@ -33,3 +33,10 @@ USE=mrustc-bootstrap CC=gcc LDFLAGS=-fuse-ld=lld emerge -1 dev-lang/rust:1.74.1
    }
    std::unique_ptr<SpecialCaseList> DefaultIgnorelist;
 ```
+
+## Stage4
+
+```sh
+docker import dist/23.0-llvm/stage3-amd64-llvm-openrc-*.tar.xz gentoo
+docker build --progress plain -t stage4 -f stage4.dockerfile .
+```
