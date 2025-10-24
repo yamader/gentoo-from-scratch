@@ -1,45 +1,43 @@
 # syntax=docker/dockerfile:1-labs
 
 FROM alpine AS live-bootstrap-src
-ARG LIVE_BOOTSTRAP_TREEISH=f2d7fda4601236656c8d3243845375ba1c1ad6d9
+WORKDIR /live-bootstrap
 RUN <<-EOS
-	apk add git
+	set -eux
 
-	mkdir live-bootstrap
-	cd live-bootstrap
-	git init
-	git remote add origin https://github.com/fosslinux/live-bootstrap
-	git fetch origin $LIVE_BOOTSTRAP_TREEISH
-	git reset --hard FETCH_HEAD
-	git submodule update --init --recursive
+	# 2025-10-19
+	wget -O- https://github.com/fosslinux/live-bootstrap/archive/63b24502c7e5bad7db5ee1d2005db4cc5905ab74.tar.gz \
+		| tee >(tar xz --strip-components=1) \
+		| sha256sum -c <(echo 82249ddbb0c57a34d8e6d775fa723b4a3987fd480a8777f52c8889ef001aad30 -)
+	wget -O- https://github.com/ironmeld/builder-hex0/archive/a2781242d19e6be891b453d8fa827137ab5db31a.tar.gz \
+		| tee >(tar xzC builder-hex0 --strip-components=1) \
+		| sha256sum -c <(echo cc42c9e40b14505cd79165b49750d54959bbfb21d738fab5e7d5762a98b1d7cb -)
+	wget -O- https://github.com/oriansj/stage0-posix/releases/download/Release_1.9.1/stage0-posix-1.9.1.tar.gz \
+		| tee >(tar xzC seed/stage0-posix --strip-components=1) \
+		| sha256sum -c <(echo f4fdda675de90ab034fd3467ef43cddff61b3d372f8e0e5c2d25d145f224226f -)
 
-	{
-		# todo: ええ感じにする
-		mkdir -p distfiles
-		wget -P distfiles \
-			https://files.bootstrapping.world/coreutils-9.4.tar.xz \
-			https://files.bootstrapping.world/gnulib-30820c.tar.gz \
-			https://files.bootstrapping.world/gnulib-8e128e.tar.gz \
-			https://files.bootstrapping.world/gnulib-d279bc.tar.gz \
-			https://files.bootstrapping.world/gnulib-3639c57.tar.gz \
-			https://files.bootstrapping.world/gnulib-5651802.tar.gz \
-			https://files.bootstrapping.world/gnulib-5d2fe24.tar.gz \
-			https://files.bootstrapping.world/gnulib-672663a.tar.gz \
-			https://files.bootstrapping.world/gnulib-7daa86f.tar.gz \
-			https://files.bootstrapping.world/gnulib-a521820.tar.gz \
-			https://files.bootstrapping.world/gnulib-b28236b.tar.gz \
-			https://files.bootstrapping.world/gnulib-b81ec69.tar.gz \
-			https://files.bootstrapping.world/gnulib-bb5bb43.tar.gz \
-			https://files.bootstrapping.world/gnulib-d271f86.tar.gz \
-			https://files.bootstrapping.world/gnulib-e017871.tar.gz \
-			https://files.bootstrapping.world/gnulib-356a414e.tar.gz \
-			https://files.bootstrapping.world/gnulib-52a06cb3.tar.gz \
-			https://files.bootstrapping.world/gnulib-8f4538a5.tar.gz \
-			https://files.bootstrapping.world/gnulib-901694b9.tar.gz
-	}
-	sed -i 's/curl.*true$/wget "$url" -O "$dest_path" || true/' download-distfiles.sh
-	sh download-distfiles.sh
+	# fix checksums
+	sed -i '
+		s/95615d5576bad50dc60f308debab69224bb0efa8681522b82f624383533f70fd/85094a1e67548dab74b93c7091678f8c2738bd1668a3907240f5ea6fbdaf36e7/;
+		s/b707a9bcb3098008dbe1cfa831d3847aab38143e44c1ab206c02f04916fd28c3/1470435d1102d03b10263689a187eb586d310a904c3980c737fa084a32b7c190/;
+		s/35034f09b78483d09a893ee1e9ddc6cb38fe6a73ee6fe63261729faab424e31f/78aa9cbb085448f505b0195dc66302c47760c97ef724f6745268a79ce1520069/;
+		s/90c4082c4019b2a045583ac338352173b9e64e51d945205378709ad76f1c25a5/339d893b330a06f85cf0dfab577d133eb7c82cbc83a0a74131f00c7b7d0c064a/;
+		s/9ef04af2574cf9518c9f36dfcd0bbc99b83c1a9d42b0505dd93c20330088aaea/162de70abe81290cd18a63482a9e5ff07bf0800c6deec0deccf9d739cf888298/;
+		s/0611b81ed8e369e54e51c5a0ac36b76fc172a7602538397a00b6166e1275d50a/72ca4bdf5678f2a7b96920c9573baf0b422783e9bd70290013cd4d4049faa4a6/;
+		s/af5238bb99a9d9d7403861ebd7290700050214e0e4a8300b874324b6b5307fe3/fd27696d358cd4f83c89902999ff8660c8ad34f47a91cc11bbd5dc8d95e4d389/;
+		s/2e4d36e9794d6646bec5c0ce4cd54932124476b451ff6d8ae7a6676e1770a19a/9a799f372ca641c339740043c9b5c4b07399aa28e9797ef1650711fdb2a8a981/;
+		s/dac25836819f6201c3f9f2db683dab299ac00719c3b241290270314250d81ab7/1d270f94cfa9b5ab4ede1ec853748574a5e3b53aaeb3160d817a8e3bd768c6da/;
+		s/8ea27e2743262b5f263527fff9ab99b76cdc5b2ec83243f9b8f6a789d112e614/c7a89c8eff816c021e0a85c7c675106f44e01a2456116371ff6a7c590ef4a789/;
+		s/204b8b2b2e712e5b638a0ec18661d7a6e704a7d08c279666da7bf79658f9db14/cf8f3db8395ac378be26badd995a9ad35186def8402758808548562da1ef3280/;
+		s/3ee21bdc9460dc56fb6482b51c9427e2b65e74e2228e0153e9ab353272e38944/75535b87799931bc2a9df8f1640e151928285397fc0b69618fc9df63b52b28f9/;
+	' steps/SHA256SUMS.pkgs
 
+	# download distfiles using mirror.sh
+	apk add curl git xz
+	mkdir distfiles
+	sh mirror.sh distfiles
+
+	# cf. rootfs.py
 	cat > steps/bootstrap.cfg <<-EOF
 		ARCH=x86
 		ARCH_DIR=x86
@@ -51,6 +49,7 @@ RUN <<-EOS
 		FINAL_JOBS=$(nproc)
 		INTERNAL_CI=False
 		INTERACTIVE=False
+		QEMU=False
 		BARE_METAL=False
 		DISK=hoge
 		KERNEL_BOOTSTRAP=False
@@ -59,14 +58,16 @@ RUN <<-EOS
 		MIRRORS_LEN=0
 	EOF
 
+	# setup new root
 	mkdir -p /rootfs/external
 	mv distfiles /rootfs/external
 	mv seed/stage0-posix/* seed/*.* steps /rootfs
+	rm -r /rootfs/High\ Level\ Prototypes
+
+	# cleanup after
 	ls /rootfs > /rootfs/srcs
 	cat >> /rootfs/srcs <<-EOF
 		configurator
-		hex0
-		kaem
 		preseed-jump.kaem
 		script-generator
 		seed-full.kaem
@@ -76,18 +77,18 @@ EOS
 FROM scratch AS live-bootstrap
 COPY --from=live-bootstrap-src /rootfs /
 # from 181 bytes hex0-seed
-# cf. https://github.com/oriansj/bootstrap-seeds/tree/cedec6b8066d1db229b6c77d42d120a23c6980ed/POSIX/x86
-RUN ["/bootstrap-seeds/POSIX/x86/hex0-seed", "/bootstrap-seeds/POSIX/x86/hex0_x86.hex0", "/hex0"]
-RUN ["/hex0", "/bootstrap-seeds/POSIX/x86/kaem-minimal.hex0", "/kaem"]
-RUN ["/kaem"]
+RUN ["./bootstrap-seeds/POSIX/x86/hex0-seed", "./x86/hex0_x86.hex0", "./x86/artifact/hex0"]
+RUN ["./x86/artifact/hex0", "./x86/kaem-minimal.hex0", "./x86/artifact/kaem-0"]
+RUN ["./x86/artifact/kaem-0"]
+RUN rm -r $(cat srcs)
 ENTRYPOINT ["/bin/bash"]
 
-#-------------------------------------------------------------------------------------------------------------------------------
-# GNU
-#-------------------------------------------------------------------------------------------------------------------------------
+# GNU --------------------------------------------------------------------------------------------------------------------------
 
 FROM live-bootstrap AS x86_64-pc-linux-gnu
 RUN <<-EOS
+	set -eux
+
 	TARGET=x86_64-pc-linux-gnu
 
 	# merge-usr
@@ -97,8 +98,8 @@ RUN <<-EOS
 	(
 		cd bootstrap-64
 
-		# 先に32bit環境でコンパイルしておく
-		curl -L https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.gz | tar xz
+		# for portage
+		curl https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.lz | tar xJ
 		cd wget-1.25.0
 		./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
 		make -j$(nproc) install
@@ -108,16 +109,16 @@ RUN <<-EOS
 		mkdir -p /usr/local/$TARGET
 		ln -s /usr/{include,lib,lib64} /usr/local/$TARGET
 
-		tar xf /external/distfiles/binutils-2.41.tar.xz
-		cd binutils-2.41
+		curl https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz | tar xJ
+		cd binutils-2.45
 		./configure --target=$TARGET --disable-gprofng
 		make -j$(nproc)
 		make install
 		cd -
 
-		tar xf /external/distfiles/gcc-13.3.0.tar.xz
-		mkdir gcc-13.3.0/build-gcc
-		cd gcc-13.3.0/build-gcc
+		curl https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz | tar xJ
+		mkdir gcc-15.2.0/build-gcc
+		cd gcc-15.2.0/build-gcc
 		# --disable-shared and --disable-threads are for libgcc
 		../configure --target=$TARGET \
 			--enable-languages=c,c++ \
@@ -133,38 +134,38 @@ RUN <<-EOS
 		make install
 		cd -
 
-		curl -L https://ftp.gnu.org/gnu/glibc/glibc-2.41.tar.xz | tar xJ
-		mkdir glibc-2.41/build-32
-		cd glibc-2.41/build-32
+		curl https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz | tar xJ
+		mkdir glibc-2.42/build-32
+		cd glibc-2.42/build-32
 		../configure --prefix=/usr --host=i686-pc-linux-gnu \
 			CC="$TARGET-gcc -m32" CXX="$TARGET-g++ -m32"
 		make -j$(nproc)
 		make install
 		cd -
-		mkdir glibc-2.41/build-64
-		cd glibc-2.41/build-64
+		mkdir glibc-2.42/build-64
+		cd glibc-2.42/build-64
 		../configure --prefix=/usr --host=$TARGET
 		make -j$(nproc)
 		make install
 		cd -
 
-		mkdir gcc-13.3.0/build-libstdc++
-		cd gcc-13.3.0/build-libstdc++
+		mkdir gcc-15.2.0/build-libstdc++
+		cd gcc-15.2.0/build-libstdc++
 		../libstdc++-v3/configure --prefix=/usr --host=$TARGET --disable-multilib
 		make -j$(nproc) install
 		cd -
 	)
 	rm -r bootstrap-64
-
-	xargs -i rm -r "{}" < srcs
 EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
-ARG GENTOO_BOOTSTRAP_TREEISH=fb43ec2626a129459b87e33cc57fb62759226ba6 # 2025-06-28 07:22:46 UTC
-ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.68
+ARG GENTOO_BOOTSTRAP_TREEISH=4c02e2713d84fdb325e9ad8141a28bf668177ca2 # 2025-11-01
+ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.69.3
 RUN <<-EOS
+	set -eux
+
 	mkdir -p /var/db/repos/gentoo
-	curl -L https://github.com/gentoo-mirror/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
+	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
 		| tar xzC /var/db/repos/gentoo --strip-components=1
 
 	mkdir -p /etc/portage
@@ -177,6 +178,9 @@ RUN <<-EOS
 		mkdir /usr/share/portage
 		cp -r $(pwd)/cnf /usr/share/portage/config
 		useradd portage
+
+		# portage uses gtar
+		ln -s tar /usr/bin/gtar
 
 		# live-bootstrap's 32bit make is not usable with -jN
 		MAKEOPTS=-j1 ./bin/emerge -1O \
@@ -253,6 +257,8 @@ EOS
 
 FROM gentoo-gnu AS gentoo-gnu-tarball
 RUN <<-EOS
+	set -eux
+
 	emerge -1j \
 		llvm-core/clang \
 		llvm-core/lld \
@@ -271,13 +277,14 @@ RUN <<-EOS
 		/*
 EOS
 
-FROM gentoo-gnu AS catalyst-base-gnu
+FROM gentoo-gnu AS catalyst-gnu
 RUN emerge -j --autounmask --autounmask-continue dev-util/catalyst
 COPY --from=gentoo-gnu-tarball /gentoo-gnu.txz /var/tmp/catalyst/builds/seed/
 
-FROM catalyst-base-gnu AS catalyst-gnu
 ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
 RUN --security=insecure <<-EOS
+	set -eux
+
 	cat >> /etc/catalyst/catalyst.conf <<-EOF
 		jobs = $(nproc)
 		load-average = $(nproc)
@@ -306,20 +313,20 @@ EOS
 FROM scratch AS target-gnu
 COPY --from=catalyst-gnu /var/tmp/catalyst/builds /
 
-#-------------------------------------------------------------------------------------------------------------------------------
-# musl
-#-------------------------------------------------------------------------------------------------------------------------------
+# musl -------------------------------------------------------------------------------------------------------------------------
 
 FROM live-bootstrap AS x86_64-pc-linux-musl
 RUN <<-EOS
+	set -eux
+
 	TARGET=x86_64-pc-linux-musl
 
 	mkdir bootstrap-64
 	(
 		cd bootstrap-64
 
-		# 先に32bit環境でコンパイルしておく
-		curl -L https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.gz | tar xz
+		# for portage
+		curl https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.lz | tar xJ
 		cd wget-1.25.0
 		./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
 		make -j$(nproc) install
@@ -329,16 +336,16 @@ RUN <<-EOS
 		mkdir -p /usr/local/$TARGET
 		ln -s /usr/{include,lib} /usr/local/$TARGET
 
-		tar xf /external/distfiles/binutils-2.41.tar.xz
-		cd binutils-2.41
+		curl https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz | tar xJ
+		cd binutils-2.45
 		./configure --target=$TARGET --disable-gprofng
 		make -j$(nproc)
 		make install
 		cd -
 
-		tar xf /external/distfiles/gcc-13.3.0.tar.xz
-		mkdir gcc-13.3.0/build-gcc
-		cd gcc-13.3.0/build-gcc
+		curl https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz | tar xJ
+		mkdir gcc-15.2.0/build-gcc
+		cd gcc-15.2.0/build-gcc
 		# --disable-shared and --disable-threads are for libgcc
 		../configure --target=$TARGET \
 			--enable-languages=c,c++ \
@@ -354,30 +361,30 @@ RUN <<-EOS
 		make install
 		cd -
 
-		tar xf /external/distfiles/musl-1.2.5.tar.gz
+		curl https://musl.libc.org/releases/musl-1.2.5.tar.gz | tar xz
 		cd musl-1.2.5
 		./configure --prefix=/usr --host=$TARGET
 		make -j$(nproc) install
 		cd -
 
-		mkdir gcc-13.3.0/build-libstdc++
-		cd gcc-13.3.0/build-libstdc++
+		mkdir gcc-15.2.0/build-libstdc++
+		cd gcc-15.2.0/build-libstdc++
 		../libstdc++-v3/configure --prefix=/usr --host=$TARGET --disable-multilib
 		make -j$(nproc) install
 		mv /usr/lib64/libs??c++* /usr/lib # for bfd
 		cd -
 	)
 	rm -r bootstrap-64
-
-	xargs -i rm -r "{}" < srcs
 EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
-ARG GENTOO_BOOTSTRAP_TREEISH=fb43ec2626a129459b87e33cc57fb62759226ba6 # 2025-06-28 07:22:46 UTC
-ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.68
+ARG GENTOO_BOOTSTRAP_TREEISH=4c02e2713d84fdb325e9ad8141a28bf668177ca2 # 2025-11-01
+ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.69.3
 RUN <<-EOS
+	set -eux
+
 	mkdir -p /var/db/repos/gentoo
-	curl -L https://github.com/gentoo-mirror/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
+	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
 		| tar xzC /var/db/repos/gentoo --strip-components=1
 
 	mkdir -p /etc/portage
@@ -390,6 +397,9 @@ RUN <<-EOS
 		mkdir /usr/share/portage
 		cp -r $(pwd)/cnf /usr/share/portage/config
 		useradd portage
+
+		# portage uses gtar
+		ln -s tar /usr/bin/gtar
 
 		# live-bootstrap's 32bit make is not usable with -jN
 		MAKEOPTS=-j1 ./bin/emerge -1O \
@@ -451,6 +461,8 @@ EOS
 
 FROM gentoo-musl AS gentoo-musl-llvm-tarball
 RUN <<-EOS
+	set -eux
+
 	emerge -1j \
 		llvm-core/clang \
 		llvm-core/lld \
@@ -475,6 +487,8 @@ COPY --from=gentoo-musl-llvm-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/s
 
 ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
 RUN --security=insecure <<-EOS
+	set -eux
+
 	cat >> /etc/catalyst/catalyst.conf <<-EOF
 		jobs = $(nproc)
 		load-average = $(nproc)
