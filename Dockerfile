@@ -1,45 +1,27 @@
 # syntax=docker/dockerfile:1-labs
 
 FROM alpine AS live-bootstrap-src
-ARG LIVE_BOOTSTRAP_TREEISH=f2d7fda4601236656c8d3243845375ba1c1ad6d9
 RUN <<-EOS
-	apk add git
-
 	mkdir live-bootstrap
 	cd live-bootstrap
-	git init
-	git remote add origin https://github.com/fosslinux/live-bootstrap
-	git fetch origin $LIVE_BOOTSTRAP_TREEISH
-	git reset --hard FETCH_HEAD
-	git submodule update --init --recursive
 
-	{
-		# todo: ええ感じにする
-		mkdir -p distfiles
-		wget -P distfiles \
-			https://files.bootstrapping.world/coreutils-9.4.tar.xz \
-			https://files.bootstrapping.world/gnulib-30820c.tar.gz \
-			https://files.bootstrapping.world/gnulib-8e128e.tar.gz \
-			https://files.bootstrapping.world/gnulib-d279bc.tar.gz \
-			https://files.bootstrapping.world/gnulib-3639c57.tar.gz \
-			https://files.bootstrapping.world/gnulib-5651802.tar.gz \
-			https://files.bootstrapping.world/gnulib-5d2fe24.tar.gz \
-			https://files.bootstrapping.world/gnulib-672663a.tar.gz \
-			https://files.bootstrapping.world/gnulib-7daa86f.tar.gz \
-			https://files.bootstrapping.world/gnulib-a521820.tar.gz \
-			https://files.bootstrapping.world/gnulib-b28236b.tar.gz \
-			https://files.bootstrapping.world/gnulib-b81ec69.tar.gz \
-			https://files.bootstrapping.world/gnulib-bb5bb43.tar.gz \
-			https://files.bootstrapping.world/gnulib-d271f86.tar.gz \
-			https://files.bootstrapping.world/gnulib-e017871.tar.gz \
-			https://files.bootstrapping.world/gnulib-356a414e.tar.gz \
-			https://files.bootstrapping.world/gnulib-52a06cb3.tar.gz \
-			https://files.bootstrapping.world/gnulib-8f4538a5.tar.gz \
-			https://files.bootstrapping.world/gnulib-901694b9.tar.gz
-	}
-	sed -i 's/curl.*true$/wget "$url" -O "$dest_path" || true/' download-distfiles.sh
-	sh download-distfiles.sh
+	# 2025-10-19
+	wget -O- https://github.com/fosslinux/live-bootstrap/archive/63b24502c7e5bad7db5ee1d2005db4cc5905ab74.tar.gz \
+		| tee >(tar xz --strip-components=1) \
+		| sha256sum -c <(echo 82249ddbb0c57a34d8e6d775fa723b4a3987fd480a8777f52c8889ef001aad30 -)
+	wget -O- https://github.com/ironmeld/builder-hex0/archive/a2781242d19e6be891b453d8fa827137ab5db31a.tar.gz \
+		| tee >(tar xzC builder-hex0 --strip-components=1) \
+		| sha256sum -c <(echo cc42c9e40b14505cd79165b49750d54959bbfb21d738fab5e7d5762a98b1d7cb -)
+	wget -O- https://github.com/oriansj/stage0-posix/releases/download/Release_1.9.1/stage0-posix-1.9.1.tar.gz \
+		| tee >(tar xzC seed/stage0-posix --strip-components=1) \
+		| sha256sum -c <(echo f4fdda675de90ab034fd3467ef43cddff61b3d372f8e0e5c2d25d145f224226f -)
 
+	# download distfiles using mirror.sh
+	apk add curl git xz
+	mkdir distfiles
+	sh mirror.sh distfiles
+
+	# cf. rootfs.py
 	cat > steps/bootstrap.cfg <<-EOF
 		ARCH=x86
 		ARCH_DIR=x86
@@ -51,6 +33,7 @@ RUN <<-EOS
 		FINAL_JOBS=$(nproc)
 		INTERNAL_CI=False
 		INTERACTIVE=False
+		QEMU=False
 		BARE_METAL=False
 		DISK=hoge
 		KERNEL_BOOTSTRAP=False
@@ -59,9 +42,12 @@ RUN <<-EOS
 		MIRRORS_LEN=0
 	EOF
 
+	# setup new root
 	mkdir -p /rootfs/external
 	mv distfiles /rootfs/external
 	mv seed/stage0-posix/* seed/*.* steps /rootfs
+
+	# cleanup after
 	ls /rootfs > /rootfs/srcs
 	cat >> /rootfs/srcs <<-EOF
 		configurator
