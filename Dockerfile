@@ -86,81 +86,90 @@ ENTRYPOINT ["/bin/bash"]
 # GNU --------------------------------------------------------------------------------------------------------------------------
 
 FROM live-bootstrap AS x86_64-pc-linux-gnu
+ARG BINUTILS=binutils-2.45
+ARG GCC=gcc-15.2.0
+ARG GLIBC=glibc-2.42
 RUN <<-EOS
 	set -eux
 
 	TARGET=x86_64-pc-linux-gnu
 
-	# merge-usr
-	ln -s usr/lib64 /lib64
+	# merge-usr for glibc
+	ln -s usr/lib64 /
 
 	mkdir bootstrap-64
-	(
-		cd bootstrap-64
+	cd bootstrap-64
 
-		# for portage
-		curl https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.lz | tar xJ
-		cd wget-1.25.0
-		./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
-		make -j$(nproc) install
-		cd -
+	curl https://ftp.gnu.org/gnu/binutils/$BINUTILS.tar.xz | tar xJ
+	curl https://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.xz | tar xJ
+	curl https://ftp.gnu.org/gnu/glibc/$GLIBC.tar.xz | tar xJ
 
-		# todo: fix gcc default search path
-		mkdir -p /usr/local/$TARGET
-		ln -s /usr/{include,lib,lib64} /usr/local/$TARGET
+	# wget w/ openssl for portage
+	curl https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.lz | tar xJ
+	cd wget-1.25.0
+	./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
+	make -j$(nproc) install
+	cd -
 
-		curl https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz | tar xJ
-		cd binutils-2.45
-		./configure --target=$TARGET --disable-gprofng
-		make -j$(nproc)
-		make install
-		cd -
+	cd $BINUTILS
+	./configure --prefix=/usr --target=$TARGET --disable-gprofng
+	make -j$(nproc)
+	make install
+	cd -
 
-		curl https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz | tar xJ
-		mkdir gcc-15.2.0/build-gcc
-		cd gcc-15.2.0/build-gcc
-		# --disable-shared and --disable-threads are for libgcc
-		../configure --target=$TARGET \
-			--enable-languages=c,c++ \
-			--disable-libatomic \
-			--disable-libgomp \
-			--disable-libquadmath \
-			--disable-libssp \
-			--disable-libstdcxx \
-			--disable-libvtv \
-			--disable-shared \
-			--disable-threads
-		make -j$(nproc)
-		make install
-		cd -
+	mkdir $GCC/build-gcc
+	cd $GCC/build-gcc
+	# --disable-shared and --disable-threads are for libgcc
+	# --disable-lto: 64bit bfd: liblto_plugin.so: wrong ELF class: ELFCLASS32
+	# --disable-fixincludes: prevent /usr/lib/gcc/x86_64-pc-linux-gnu/15.2.0/include-fixed/stdio.h
+	# --with-newlib: cf. https://ryanstan.com/gcc-without-headers-flag.html
+	../configure \
+		--prefix=/usr \
+		--target=$TARGET \
+		--enable-languages=c,c++ \
+		--disable-libatomic \
+		--disable-libgomp \
+		--disable-libquadmath \
+		--disable-libssp \
+		--disable-libstdcxx \
+		--disable-libvtv \
+		--disable-shared \
+		--disable-threads \
+		--disable-lto \
+		--disable-fixincludes \
+		--with-sysroot=/ \
+		--with-newlib \
+		--without-headers
+	make -j$(nproc)
+	make install
+	cd -
 
-		curl https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz | tar xJ
-		mkdir glibc-2.42/build-32
-		cd glibc-2.42/build-32
-		../configure --prefix=/usr --host=i686-pc-linux-gnu \
-			CC="$TARGET-gcc -m32" CXX="$TARGET-g++ -m32"
-		make -j$(nproc)
-		make install
-		cd -
-		mkdir glibc-2.42/build-64
-		cd glibc-2.42/build-64
-		../configure --prefix=/usr --host=$TARGET
-		make -j$(nproc)
-		make install
-		cd -
+	mkdir $GLIBC/build
+	cd $GLIBC/build
+	../configure --prefix=/usr --host=$TARGET
+	make -j$(nproc)
+	make install
+	cd -
 
-		mkdir gcc-15.2.0/build-libstdc++
-		cd gcc-15.2.0/build-libstdc++
-		../libstdc++-v3/configure --prefix=/usr --host=$TARGET --disable-multilib
-		make -j$(nproc) install
-		cd -
-	)
+	mkdir $GCC/build-libstdc++
+	cd $GCC/build-libstdc++
+	../libstdc++-v3/configure \
+		--prefix=/usr/lib/gcc/$TARGET/${GCC#gcc-} \
+		--host=$TARGET \
+		--disable-multilib
+	make -j$(nproc) install
+	cd -
+
+	cd ..
 	rm -r bootstrap-64
+
+	# fix musl for coreutils
+	rm /usr/include/stropts.h
 EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
-ARG GENTOO_BOOTSTRAP_TREEISH=4c02e2713d84fdb325e9ad8141a28bf668177ca2 # 2025-11-01
-ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.69.3
+ARG GENTOO_BOOTSTRAP_TREEISH=8deab2cbead018bd06eaef49c7ca0e5d775cc800 # 2025-10-23
+ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.69.2
 RUN <<-EOS
 	set -eux
 
@@ -168,72 +177,56 @@ RUN <<-EOS
 	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
 		| tar xzC /var/db/repos/gentoo --strip-components=1
 
-	mkdir -p /etc/portage
+	mkdir -p /etc/portage/profile
 	ln -s ../../var/db/repos/gentoo/profiles/default/linux/amd64/23.0 /etc/portage/make.profile
 
 	curl -L https://github.com/gentoo/portage/archive/$PORTAGE_BOOTSTRAP_TREEISH.tar.gz | tar xz
-	(
-		cd portage-$PORTAGE_BOOTSTRAP_TREEISH
+	cd portage-$PORTAGE_BOOTSTRAP_TREEISH
 
-		mkdir /usr/share/portage
-		cp -r $(pwd)/cnf /usr/share/portage/config
-		useradd portage
+	mkdir /usr/share/portage
+	cp -r cnf /usr/share/portage/config
+	useradd portage
 
-		# portage uses gtar
-		ln -s tar /usr/bin/gtar
+	# fix make; live-bootstrap's is not usable with -jN
+	MAKEOPTS=-j1 ./bin/emerge -1O \
+		app-portage/elt-patches \
+		sys-apps/gentoo-functions \
+		app-arch/xz-utils \
+		dev-build/make
 
-		# live-bootstrap's 32bit make is not usable with -jN
-		MAKEOPTS=-j1 ./bin/emerge -1O \
-			app-portage/elt-patches \
-			sys-apps/gentoo-functions \
-			app-arch/xz-utils \
-			dev-build/make
+	# fix toolchain
+	USE=-* ./bin/emerge -1O \
+		sys-libs/zlib \
+		sys-devel/binutils-config \
+		sys-devel/binutils \
+		dev-build/autoconf \
+		dev-build/automake \
+		net-misc/rsync \
+		sys-kernel/linux-headers \
+		dev-libs/gmp \
+		dev-libs/mpfr \
+		dev-libs/mpc \
+		sys-devel/gcc-config \
+		sys-devel/gcc
 
-		USE='-* openmp' ./bin/emerge -1O \
-			dev-build/autoconf \
-			dev-build/autoconf-wrapper \
-			dev-build/automake \
-			dev-build/automake-wrapper \
-			sys-libs/zlib \
-			dev-libs/gmp \
-			dev-libs/mpfr \
-			dev-libs/mpc \
-			net-misc/rsync \
-			sys-kernel/linux-headers \
-			sys-devel/binutils-config \
-			sys-devel/binutils \
-			sys-devel/gcc-config \
-			sys-devel/gcc
-		rm -r /usr/local
+	# fix bzip2
+	mkdir -p /usr/local/bin
+	mv /usr/bin/bzip2 /usr/local/bin
+	USE=-* ./bin/emerge -1Oj app-arch/bzip2
+	rm /usr/local/bin/bzip2
 
-		# for python
-		mkdir -p /usr/local/bin
-		mv /usr/bin/bzip2 /usr/local/bin
-		./bin/emerge -1Oj app-arch/bzip2
-		rm /usr/local/bin/bzip2
+	# fix profile
+	USE=-* ./bin/emerge -1Oj \
+		app-crypt/libb2 \
+		sys-apps/util-linux \
+		sys-devel/gettext \
+		sys-libs/libxcrypt \
+		virtual/libcrypt
 
-		USE='-* ssl' ./bin/emerge -1O \
-			sys-apps/util-linux \
-			dev-libs/expat \
-			dev-libs/libffi \
-			dev-libs/openssl \
-			dev-util/pkgconf \
-			dev-lang/python \
-			dev-lang/python-exec
-		./bin/emerge -1O sys-libs/glibc
+	# install portage
+	./bin/emerge -1j sys-apps/portage
 
-		# fix sys-apps/coreutils
-		rm /usr/include/stropts.h
-
-		# fix profile
-		USE=-* ./bin/emerge -1Oj \
-			sys-devel/gettext \
-			sys-libs/libcap
-		./bin/emerge -1Oj \
-			sys-libs/libxcrypt
-
-		./bin/emerge -1j sys-apps/portage
-	)
+	cd -
 	rm -r portage-$PORTAGE_BOOTSTRAP_TREEISH
 
 	# moving to 64bit
@@ -249,10 +242,14 @@ RUN <<-EOS
 
 	# diet
 	rm -r \
-		/var/cache/* \
-		/usr/lib/i386-unknown-linux-musl \
-		/usr/libexec/gcc/i386-unknown-linux-musl \
-		/usr/lib/python3.11
+		/usr/i686-unknown-linux-musl \
+		/usr/include/c++ \
+		/usr/lib/i686-unknown-linux-musl \
+		/usr/lib/perl5 \
+		/usr/lib/python2.5 \
+		/usr/lib/python3.11 \
+		/usr/libexec/gcc/i686-unknown-linux-musl \
+		/var/cache/*
 EOS
 
 FROM gentoo-gnu AS gentoo-gnu-tarball
