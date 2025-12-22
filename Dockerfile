@@ -332,146 +332,143 @@ RUN <<-EOS
 	set -eux
 
 	TARGET=x86_64-pc-linux-musl
+	BINUTILS=binutils-2.45
+	GCC=gcc-15.2.0
+	MUSL=musl-1.2.5
+	WGET=wget-1.25.0
 
 	mkdir bootstrap-64
-	(
-		cd bootstrap-64
+	cd bootstrap-64
 
-		# for portage
-		curl https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.lz | tar xJ
-		cd wget-1.25.0
-		./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
-		make -j$(nproc) install
-		cd -
+	curl https://ftp.gnu.org/gnu/binutils/$BINUTILS.tar.xz | tar xJ
+	curl https://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.xz | tar xJ
+	curl https://musl.libc.org/releases/$MUSL.tar.gz | tar xz
+	curl https://ftp.gnu.org/gnu/wget/$WGET.tar.lz | tar xJ
 
-		# todo: fix gcc default search path
-		mkdir -p /usr/local/$TARGET
-		ln -s /usr/{include,lib} /usr/local/$TARGET
+	cd $WGET
+	./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
+	make -j$(nproc) install
+	cd -
 
-		curl https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz | tar xJ
-		cd binutils-2.45
-		./configure --target=$TARGET --disable-gprofng
-		make -j$(nproc)
-		make install
-		cd -
+	cd $BINUTILS
+	./configure --target=$TARGET --disable-gprofng
+	make -j$(nproc)
+	make install
+	cd -
 
-		curl https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz | tar xJ
-		mkdir gcc-15.2.0/build-gcc
-		cd gcc-15.2.0/build-gcc
-		# --disable-shared and --disable-threads are for libgcc
-		../configure --target=$TARGET \
-			--enable-languages=c,c++ \
-			--disable-libatomic \
-			--disable-libgomp \
-			--disable-libquadmath \
-			--disable-libssp \
-			--disable-libstdcxx \
-			--disable-libvtv \
-			--disable-shared \
-			--disable-threads
-		make -j$(nproc)
-		make install
-		cd -
+	mkdir $GCC/build-gcc
+	cd $GCC/build-gcc
+	../configure \
+		--target=$TARGET \
+		--enable-languages=c,c++ \
+		--disable-libatomic \
+		--disable-libgomp \
+		--disable-libquadmath \
+		--disable-libssp \
+		--disable-libstdcxx \
+		--disable-libvtv \
+		--disable-shared \
+		--disable-threads \
+		--with-sysroot=/ \
+		--without-headers \
+		--with-newlib
+	make -j$(nproc)
+	make install
+	cd -
 
-		curl https://musl.libc.org/releases/musl-1.2.5.tar.gz | tar xz
-		cd musl-1.2.5
-		./configure --prefix=/usr --host=$TARGET
-		make -j$(nproc) install
-		cd -
+	cd $MUSL
+	./configure --prefix=/usr --target=$TARGET
+	make -j$(nproc) install
+	cd -
 
-		mkdir gcc-15.2.0/build-libstdc++
-		cd gcc-15.2.0/build-libstdc++
-		../libstdc++-v3/configure --prefix=/usr --host=$TARGET --disable-multilib
-		make -j$(nproc) install
-		mv /usr/lib64/libs??c++* /usr/lib # for bfd
-		cd -
-	)
+	mkdir $GCC/build-libstdc++
+	cd $GCC/build-libstdc++
+	../libstdc++-v3/configure \
+		--prefix=/usr/local/$TARGET \
+		--host=$TARGET \
+		--disable-multilib
+	make -j$(nproc) install
+	cd -
+
+	cd ..
 	rm -r bootstrap-64
 EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
-ARG GENTOO_BOOTSTRAP_TREEISH=4c02e2713d84fdb325e9ad8141a28bf668177ca2 # 2025-11-01
-ARG PORTAGE_BOOTSTRAP_TREEISH=portage-3.0.69.3
+ARG GENTOO=4ff72634fd6dd4da1c91ececea47aa17133d2b3e # 2025-12-18
 RUN <<-EOS
 	set -eux
 
-	mkdir -p /var/db/repos/gentoo
-	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_BOOTSTRAP_TREEISH.tar.gz \
-		| tar xzC /var/db/repos/gentoo --strip-components=1
+	PORTAGE=portage-3.0.69.3
 
-	mkdir -p /etc/portage
+	mkdir -p /etc/portage /var/db/repos/gentoo
+	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO.tar.gz | tar xzC /var/db/repos/gentoo --strip-components=1
 	ln -s ../../var/db/repos/gentoo/profiles/default/linux/amd64/23.0/musl /etc/portage/make.profile
 
-	curl -L https://github.com/gentoo/portage/archive/$PORTAGE_BOOTSTRAP_TREEISH.tar.gz | tar xz
-	(
-		cd portage-$PORTAGE_BOOTSTRAP_TREEISH
+	curl -L https://github.com/gentoo/portage/archive/$PORTAGE.tar.gz | tar xz
+	cd portage-$PORTAGE
 
-		mkdir /usr/share/portage
-		cp -r $(pwd)/cnf /usr/share/portage/config
-		useradd portage
+	mkdir /usr/share/portage
+	cp -r cnf /usr/share/portage/config
+	useradd portage
 
-		# portage uses gtar
-		ln -s tar /usr/bin/gtar
+	ln -s tar /usr/bin/gtar
 
-		# live-bootstrap's 32bit make is not usable with -jN
-		MAKEOPTS=-j1 ./bin/emerge -1O \
-			app-portage/elt-patches \
-			sys-apps/gentoo-functions \
-			app-arch/xz-utils \
-			dev-build/make
+	MAKEOPTS=-j1 ./bin/emerge -1O \
+		app-portage/elt-patches \
+		sys-apps/gentoo-functions \
+		app-arch/xz-utils \
+		dev-build/make
 
-		USE='-* openmp' ./bin/emerge -1O \
-			sys-libs/musl \
-			sys-libs/zlib \
-			dev-libs/gmp \
-			dev-libs/mpfr \
-			dev-libs/mpc \
-			sys-devel/binutils-config \
-			sys-devel/binutils \
-			sys-devel/gcc-config \
-			sys-devel/gcc
-		rm -r /usr/local
-		rm /usr/lib/libs??c++*
+	USE=-* ./bin/emerge -1O \
+		sys-libs/zlib \
+		sys-devel/binutils-config \
+		sys-devel/binutils \
+		dev-build/autoconf \
+		dev-build/automake \
+		net-misc/rsync \
+		sys-kernel/linux-headers \
+		sys-libs/musl \
+		dev-libs/gmp \
+		dev-libs/mpfr \
+		dev-libs/mpc \
+		sys-devel/gcc-config \
+		sys-devel/gcc
 
-		# for python
-		mkdir -p /usr/local/bin
-		mv /usr/bin/bzip2 /usr/local/bin
-		./bin/emerge -1O app-arch/bzip2
-		rm /usr/local/bin/bzip2
+	mv /bin/{bzip2,gunzip,gzip,zcat} /usr/local/bin
+	USE=-* ./bin/emerge -1Oj \
+		app-arch/bzip2 \
+		app-arch/gzip
 
-		# fix profile
-		USE=-* ./bin/emerge -1O \
-			dev-build/autoconf \
-			dev-build/autoconf-wrapper \
-			dev-build/automake \
-			dev-build/automake-wrapper \
-			net-misc/rsync \
-			sys-kernel/linux-headers \
-			sys-apps/util-linux \
-			sys-devel/gettext
+	rm -r /usr/local
 
-		./bin/emerge -1j sys-apps/portage
-	)
-	rm -r portage-$PORTAGE_BOOTSTRAP_TREEISH
+	USE=-* ./bin/emerge -1Oj \
+		app-crypt/libb2 \
+		sys-apps/util-linux \
+		sys-devel/gettext
 
-	# moving to 64bit
-	mv /usr/bin/{gunzip,gzip,zcat} /usr/local/bin
-	USE=-* emerge -1Oj \
-		app-arch/gzip \
-		net-misc/wget \
-		sys-apps/diffutils \
-		sys-apps/shadow
-	rm /usr/local/bin/{gunzip,gzip,zcat}
+	./bin/emerge -1j sys-apps/portage
 
-	# diet
+	cd -
+	rm -r portage-$PORTAGE
+
+	emerge -1Oj \
+		dev-lang/perl \
+		net-misc/wget
+
 	rm -r \
-		/var/cache/* \
-		/usr/lib/i386-unknown-linux-musl \
-		/usr/libexec/gcc/i386-unknown-linux-musl \
-		/usr/lib/python3.11
+		/usr/bin/perl5.{1..3}* \
+		/usr/i686-unknown-linux-musl \
+		/usr/include/c++ \
+		/usr/lib/i686-unknown-linux-musl \
+		/usr/lib/perl5 \
+		/usr/lib/python2.5 \
+		/usr/lib/python3.11 \
+		/usr/libexec/gcc/i686-unknown-linux-musl \
+		/var/cache/*
 EOS
 
-FROM gentoo-musl AS gentoo-musl-llvm-tarball
+FROM gentoo-musl AS gentoo-musl-tarball
 RUN <<-EOS
 	set -eux
 
@@ -495,7 +492,7 @@ EOS
 
 FROM gentoo-musl AS catalyst-musl
 RUN emerge -j --autounmask --autounmask-continue dev-util/catalyst
-COPY --from=gentoo-musl-llvm-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/seed/
+COPY --from=gentoo-musl-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/seed/
 
 ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
 RUN --security=insecure <<-EOS
