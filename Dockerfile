@@ -280,51 +280,6 @@ RUN <<-EOS
 		/*
 EOS
 
-FROM gentoo-gnu AS catalyst-gnu
-RUN <<-EOS
-	set -eux
-
-	emerge -1Oj acct-group/shadow
-	USE=-* emerge -1Oj \
-		sys-apps/diffutils \
-		sys-apps/shadow
-
-	emerge -j --autounmask --autounmask-continue dev-util/catalyst
-EOS
-COPY --from=gentoo-gnu-tarball /gentoo-gnu.txz /var/tmp/catalyst/builds/seed/
-
-ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
-RUN --security=insecure <<-EOS
-	set -eux
-
-	cat >> /etc/catalyst/catalyst.conf <<-EOF
-		jobs = $(nproc)
-		load-average = $(nproc)
-		var_tmpfs_portage = 16
-	EOF
-
-	catalyst -s stable
-	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
-
-	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_TREEISH.tar.gz | tar xz
-	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_TREEISH
-	SPECS=($REPO_DIR/releases/specs/amd64/llvm/stage?-openrc-23.spec)
-
-	sed -i '/source/c\source_subpath: seed/gentoo-gnu' $SPECS
-	sed -i "
-		s|@REPO_DIR@|$REPO_DIR|g
-		s|@TIMESTAMP@|$(date -u +%Y%m%dT%H%M%SZ)|g
-		s|@TREEISH@|$TREEISH|g
-	" ${SPECS[@]}
-
-	for i in ${SPECS[@]}; do
-		catalyst -f $i
-	done
-EOS
-
-FROM scratch AS target-gnu
-COPY --from=catalyst-gnu /var/tmp/catalyst/builds /
-
 # musl -------------------------------------------------------------------------------------------------------------------------
 
 FROM live-bootstrap AS x86_64-pc-linux-musl
@@ -490,11 +445,24 @@ RUN <<-EOS
 		/*
 EOS
 
-FROM gentoo-musl AS catalyst-musl
-RUN emerge -j --autounmask --autounmask-continue dev-util/catalyst
+# Catalyst ---------------------------------------------------------------------------------------------------------------------
+
+FROM gentoo-gnu AS catalyst
+RUN <<-EOS
+	set -eux
+
+	echo shadow:x:42: >> /etc/group
+	USE=-* emerge -1Oj \
+		sys-apps/diffutils \
+		sys-apps/shadow
+
+	emerge -j --autounmask --autounmask-continue dev-util/catalyst
+EOS
+
+COPY --from=gentoo-gnu-tarball /gentoo-gnu.txz /var/tmp/catalyst/builds/seed/
 COPY --from=gentoo-musl-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/seed/
 
-ARG GENTOO_RELENG_TREEISH=8d228cd6a6912d15e7d0a669fadf9732ab3c1018 # latest specs and confdir
+ARG RELENG=656eb9734f2f936fcf136d269cfd0f63442954eb # latest releases/specs/amd64 and releases/portage/stages
 RUN --security=insecure <<-EOS
 	set -eux
 
@@ -505,17 +473,22 @@ RUN --security=insecure <<-EOS
 	EOF
 
 	catalyst -s stable
+	wget -O- https://github.com/gentoo/releng/archive/$RELENG.tar.gz | tar xz
+	cd releng-$RELENG
+
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
+	REPO_DIR=$(pwd)
+	SPECS=(
+		releases/specs/amd64/llvm/*
+		releases/specs/amd64/musl-llvm/*
+	)
 
-	wget -O- https://github.com/gentoo/releng/archive/$GENTOO_RELENG_TREEISH.tar.gz | tar xz
-	REPO_DIR=$(pwd)/releng-$GENTOO_RELENG_TREEISH
-	SPECS=($REPO_DIR/releases/specs/amd64/musl-llvm/stage?-23.spec)
-
-	sed -i '/source/c\source_subpath: seed/gentoo-musl' $SPECS
+	sed -i '/source_subpath:/c source_subpath: seed/gentoo-gnu' releases/specs/amd64/llvm/stage1*
+	sed -i '/source_subpath:/c source_subpath: seed/gentoo-musl' releases/specs/amd64/musl-llvm/stage1*
 	sed -i "
-		s|@REPO_DIR@|$REPO_DIR|g
 		s|@TIMESTAMP@|$(date -u +%Y%m%dT%H%M%SZ)|g
 		s|@TREEISH@|$TREEISH|g
+		s|@REPO_DIR@|$REPO_DIR|g
 	" ${SPECS[@]}
 
 	for i in ${SPECS[@]}; do
@@ -523,5 +496,5 @@ RUN --security=insecure <<-EOS
 	done
 EOS
 
-FROM scratch AS target-musl
-COPY --from=catalyst-musl /var/tmp/catalyst/builds /
+FROM scratch
+COPY --from=catalyst /var/tmp/catalyst/builds /
