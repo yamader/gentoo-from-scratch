@@ -2,7 +2,7 @@
 
 FROM alpine AS live-bootstrap-src
 WORKDIR /live-bootstrap
-RUN <<-EOS
+RUN --mount=type=cache,target=/live-bootstrap/distfiles <<-EOS
 	set -eux
 
 	# 2025-10-19
@@ -34,7 +34,7 @@ RUN <<-EOS
 
 	# download distfiles using mirror.sh
 	apk add curl git xz
-	mkdir distfiles
+	mkdir -p distfiles
 	sh mirror.sh distfiles
 
 	# cf. rootfs.py
@@ -60,8 +60,8 @@ RUN <<-EOS
 
 	# setup new root
 	mkdir -p /rootfs/external
-	mv distfiles /rootfs/external
-	mv seed/stage0-posix/* seed/*.* steps /rootfs
+	cp -r distfiles /rootfs/external/
+	mv seed/stage0-posix/* seed/*.* steps /rootfs/
 	rm -r /rootfs/High\ Level\ Prototypes
 
 	# cleanup after
@@ -176,7 +176,7 @@ EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
 ARG GENTOO=4ff72634fd6dd4da1c91ececea47aa17133d2b3e # 2025-12-18
-RUN <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 	set -eux
 
 	# portage-3.0.70: find: invalid predicate `-files0-from'
@@ -240,12 +240,11 @@ RUN <<-EOS
 	cd -
 	rm -r portage-$PORTAGE
 
-	# moving to 64bit
-	emerge -1Oj \
-		dev-lang/perl \
-		net-misc/wget
-
 	# diet
+	echo shadow:x:42: >> /etc/group
+	USE=-* emerge -1Oj \
+		net-misc/wget \
+		sys-apps/shadow
 	rm -r \
 		/usr/bin/perl5.{1..3}* \
 		/usr/i686-unknown-linux-musl \
@@ -254,12 +253,12 @@ RUN <<-EOS
 		/usr/lib/perl5 \
 		/usr/lib/python2.5 \
 		/usr/lib/python3.11 \
-		/usr/libexec/gcc/i686-unknown-linux-musl \
-		/var/cache/*
+		/usr/libexec/gcc/i686-unknown-linux-musl
+	emerge -1Oj dev-lang/perl
 EOS
 
 FROM gentoo-gnu AS gentoo-gnu-tarball
-RUN <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 	set -eux
 
 	emerge -1j \
@@ -270,13 +269,12 @@ RUN <<-EOS
 		llvm-runtimes/libcxx \
 		llvm-runtimes/libcxxabi \
 		llvm-runtimes/libunwind
-	rm -r /var/cache/*
 
 	tar cJf /gentoo-gnu.txz \
 		--exclude /dev \
 		--exclude /proc \
 		--exclude /sys \
-		--exclude /var/db/repos/* \
+		--exclude /var/db/repos/gentoo \
 		/*
 EOS
 
@@ -351,7 +349,7 @@ EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
 ARG GENTOO=4ff72634fd6dd4da1c91ececea47aa17133d2b3e # 2025-12-18
-RUN <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 	set -eux
 
 	PORTAGE=portage-3.0.69.3
@@ -407,10 +405,10 @@ RUN <<-EOS
 	cd -
 	rm -r portage-$PORTAGE
 
-	emerge -1Oj \
-		dev-lang/perl \
-		net-misc/wget
-
+	echo shadow:x:42: >> /etc/group
+	USE=-* emerge -1Oj \
+		net-misc/wget \
+		sys-apps/shadow
 	rm -r \
 		/usr/bin/perl5.{1..3}* \
 		/usr/i686-unknown-linux-musl \
@@ -419,12 +417,12 @@ RUN <<-EOS
 		/usr/lib/perl5 \
 		/usr/lib/python2.5 \
 		/usr/lib/python3.11 \
-		/usr/libexec/gcc/i686-unknown-linux-musl \
-		/var/cache/*
+		/usr/libexec/gcc/i686-unknown-linux-musl
+	emerge -1Oj dev-lang/perl
 EOS
 
 FROM gentoo-musl AS gentoo-musl-tarball
-RUN <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 	set -eux
 
 	emerge -1j \
@@ -435,35 +433,25 @@ RUN <<-EOS
 		llvm-runtimes/libcxx \
 		llvm-runtimes/libcxxabi \
 		llvm-runtimes/libunwind
-	rm -r /var/cache/*
 
 	tar cJf /gentoo-musl.txz \
 		--exclude /dev \
 		--exclude /proc \
 		--exclude /sys \
-		--exclude /var/db/repos/* \
+		--exclude /var/db/repos/gentoo \
 		/*
 EOS
 
 # Catalyst ---------------------------------------------------------------------------------------------------------------------
 
 FROM gentoo-gnu AS catalyst
-RUN <<-EOS
-	set -eux
-
-	echo shadow:x:42: >> /etc/group
-	USE=-* emerge -1Oj \
-		sys-apps/diffutils \
-		sys-apps/shadow
-
-	emerge -j --autounmask --autounmask-continue dev-util/catalyst
-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles emerge -j --autounmask --autounmask-continue dev-util/catalyst
 
 COPY --from=gentoo-gnu-tarball /gentoo-gnu.txz /var/tmp/catalyst/builds/seed/
 COPY --from=gentoo-musl-tarball /gentoo-musl.txz /var/tmp/catalyst/builds/seed/
 
 ARG RELENG=656eb9734f2f936fcf136d269cfd0f63442954eb # latest releases/specs/amd64 and releases/portage/stages
-RUN --security=insecure <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --security=insecure <<-EOS
 	set -eux
 
 	cat >> /etc/catalyst/catalyst.conf <<-EOF
@@ -496,5 +484,5 @@ RUN --security=insecure <<-EOS
 	done
 EOS
 
-FROM scratch
+FROM scratch AS target
 COPY --from=catalyst /var/tmp/catalyst/builds /
