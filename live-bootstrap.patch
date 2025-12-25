@@ -1,0 +1,76 @@
+fix 83dae02dbf43ae560200bcb32f09898385656f8f
+
+--- a/steps/autogen-5.18.16/pass1.sh
++++ b/steps/autogen-5.18.16/pass1.sh
+@@ -10 +10 @@
+-    mv ../autogen-5.18.16 build/src
++    mv ../autogen-v5.18.16 build/src
+--- a/steps/autogen-5.18.16/sources
++++ b/steps/autogen-5.18.16/sources
+@@ -3 +3 @@
+-g https://https.git.savannah.gnu.org/git/autogen.git~v5.18.16 https://git.savannah.gnu.org/cgit/autogen.git/snapshot/autogen-5.18.16.tar.gz 0c04ab2f7ce13c4a1c06c4abc7dfe75312aad89b8b0a1068e5e563787eb56632
++g https://https.git.savannah.gnu.org/git/autogen.git~v5.18.16 https://git.savannah.gnu.org/cgit/autogen.git/snapshot/autogen-5.18.16.tar.gz 08882bc29dadc99e4e46a52b0791c1f4a48b2ccc609f77ca6c8f1a89d9fda495
+--- a/steps/coreutils-9.4/patches/remove_gettext.patch
++++ b/steps/coreutils-9.4/patches/remove_gettext.patch
+@@ -8,2 +8,2 @@
+---- coreutils-9.4/configure.ac
+-+++ coreutils-9.4/configure.ac
++--- coreutils-v9.4/configure.ac
+++++ coreutils-v9.4/configure.ac
+@@ -21,2 +21,2 @@
+---- coreutils-9.4/Makefile.am
+-+++ coreutils-9.4/Makefile.am
++--- coreutils-v9.4/Makefile.am
+++++ coreutils-v9.4/Makefile.am
+--- a/steps/coreutils-9.4/sources
++++ b/steps/coreutils-9.4/sources
+@@ -1 +1 @@
+-g https://https.git.savannah.gnu.org/git/coreutils.git~v9.4 http://git.savannah.gnu.org/cgit/coreutils.git/snapshot/coreutils-9.4.tar.xz 8fb56810310253300b3d6f84e68dc97eb2d74e1f4f78e05776831d9d82e4f2d7
++g https://https.git.savannah.gnu.org/git/coreutils.git~v9.4 http://git.savannah.gnu.org/cgit/coreutils.git/snapshot/coreutils-9.4.tar.xz e1e171e979e84c86a440910e682f2f3e1d6a210c25c20044f711dffbc1d63e2f
+--- a/steps/kexec-tools-2.0.22/patches/bad-gcc-arg.patch
++++ b/steps/kexec-tools-2.0.22/patches/bad-gcc-arg.patch
+@@ -7,2 +7,2 @@
+---- kexec-tools-2.0.22/purgatory/Makefile	2021-06-03 17:03:41.534638295 +1000
+-+++ kexec-tools-2.0.22/purgatory/Makefile	2021-06-03 17:03:50.489716136 +1000
++--- kexec-tools-v2.0.22/purgatory/Makefile	2021-06-03 17:03:41.534638295 +1000
+++++ kexec-tools-v2.0.22/purgatory/Makefile	2021-06-03 17:03:50.489716136 +1000
+--- a/steps/kexec-tools-2.0.22/sources
++++ b/steps/kexec-tools-2.0.22/sources
+@@ -1 +1 @@
+-g https://github.com/horms/kexec-tools~v2.0.22 https://github.com/horms/kexec-tools/archive/refs/tags/v2.0.22.tar.gz af618de7848142f204b57811f703de3ae7aa3f5bc5d52226db35800fa8fc4dff
++g https://github.com/horms/kexec-tools~v2.0.22 https://github.com/horms/kexec-tools/archive/refs/tags/v2.0.22.tar.gz db00fcddbde1771682b968db5e3e507b75c4bfe5e845ebb5246dd067e4709830
+
+
+fix artifacts checksums
+
+--- a/steps/SHA256SUMS.pkgs
++++ b/steps/SHA256SUMS.pkgs
+@@ -61 +61 @@
+-38b015fe07ed755377b78f8ac8815d8bb57fa8c79293110522231250a6ad8a6f  gettext-0.26_0.tar.bz2
++1d0a4196f8818df9c23bb97ea3b51e0addc7568913e06863abb6a72989ef693e  gettext-0.26_0.tar.bz2
+@@ -104,11 +104,11 @@
+-88535597725f0de65104ef30de726e9ac0d0005d01b897ee9c9523d52bb170fd  perl-5.12.5_0.tar.bz2
+-e322d90de63c2d6d2eb28440cbc83577e3fda36aad44bff7e6bf77cdcb544f88  perl-5.15.7_0.tar.bz2
+-bdec75e403ae9039b25d9c6b08c90ab7c1e55550bc9e40b0be7e092a2cc612f5  perl-5.16.3_0.tar.bz2
+-cd666e1367340f5857f67cd062be93ead0fb9ea39a050abc8bc8b4696bfc4843  perl-5.17.2_0.tar.bz2
+-d9dd1247ac64d8fb630e23d1f090355482a533f02ebde76dbe44568dab67cdaf  perl-5.17.4_0.tar.bz2
+-5ede374c00f2f067586acaca0c9ebb28b835dd27932df46ed694a485561270fb  perl-5.18.4_0.tar.bz2
+-de1ea2e4d986cdc2007d274d3416db910b07cc11e5ab64da08f25ddfc4e7fc63  perl-5.22.4_0.tar.bz2
+-123553fbce825c4776f3450f69504ad52040b3d02be76789b266aabe90b47aea  perl-5.24.4_0.tar.bz2
+-4c468564d444438faa4af6668683de499ddb5ead818835ccc3da1745a83626f2  perl-5.30.3_0.tar.bz2
+-61cd6d137b1368f4b134f8c560771806611c0bb4df9924c0949b34bc50e90452  perl-5.36.3_0.tar.bz2
+-b7d48b4878c259e877c2aa0937890564854977cb2d5dac3b7831bf48aef2c231  perl-5.42.0_0.tar.bz2
++c0c285dd6f2cbb661f001db32a2c217afdfe7864ace6d0352bb113288e1761de  perl-5.12.5_0.tar.bz2
++f44c264eefe1d351637121012034eb35737bd99a622e50eb372888e7f5dc6918  perl-5.15.7_0.tar.bz2
++f3c83e6fa79a2f9c556c2b97cc8906d9a22cc249d747a175a96a6c4cc49be6a3  perl-5.16.3_0.tar.bz2
++7da13947ce1427318cecf5b6f0b5394e0e367a4792e68f270945b8542a788d3b  perl-5.17.2_0.tar.bz2
++5847777209c9b20b09542bd2bf43e97f06e1eb777724d18162c8cbe73576a133  perl-5.17.4_0.tar.bz2
++6369ddbdb8ab507c685370fc34beb0f9e9b70232bab4df5654d21b35809f3038  perl-5.18.4_0.tar.bz2
++6b16f52b49cef643177c252dbbaafc3c27333efeb57d8308cad45ac1596ce2d2  perl-5.22.4_0.tar.bz2
++52504d12f51fa3a44da808cbe2fdffb5aa040405e35f5a058744785b74c996d0  perl-5.24.4_0.tar.bz2
++08c52048e1d645d18ccae883a41a915fd0e9e1deb1eed426a64618195c05c54c  perl-5.30.3_0.tar.bz2
++e57d8f40bda2bc4b4637c2fc8dfac331e423c50a9f7bc153c7a26d32317d6022  perl-5.36.3_0.tar.bz2
++1d2db51ae9bfe65f628fc6e8634a585fb4b1cc17814d540654d771d7a43f4640  perl-5.42.0_0.tar.bz2
+@@ -116 +116 @@
+-80b866cb7f9222f5d02909311365a7bd0aac66a90b202376225338e8336ec82a  perl-5.8.9_0.tar.bz2
++5ca6a07e289e82334e870d753cac9d8e29297d67371a3f3b2fad86627868443a  perl-5.8.9_0.tar.bz2
