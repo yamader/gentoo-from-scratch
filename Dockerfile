@@ -167,7 +167,7 @@ EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
 ARG GENTOO_STAGE0=c929c47f09339eb3bb4ff108ba8ca6a722680d19 # 2026-01-06; latest sys-apps/portage
-RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
 	# portage-3.0.70: find: invalid predicate `-files0-from'
@@ -250,7 +250,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 EOS
 
 FROM gentoo-gnu AS stage0-amd64-gnu
-RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
 	# fix systemd
@@ -347,7 +347,7 @@ EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
 ARG GENTOO_STAGE0=c929c47f09339eb3bb4ff108ba8ca6a722680d19
-RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
 	PORTAGE=portage-3.0.69.3
@@ -421,7 +421,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
 EOS
 
 FROM gentoo-musl AS stage0-amd64-musl
-RUN --mount=type=cache,target=/var/cache/distfiles <<-EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
 	USE='default-compiler-rt default-libcxx default-lld llvm-libunwind' \
@@ -445,13 +445,14 @@ EOS
 # Catalyst ---------------------------------------------------------------------------------------------------------------------
 
 FROM gentoo-gnu AS catalyst
-RUN --mount=type=cache,target=/var/cache/distfiles emerge -j --autounmask --autounmask-continue dev-util/catalyst sys-apps/which
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
+	emerge -j --autounmask --autounmask-continue dev-util/catalyst sys-apps/which
 
 COPY --from=stage0-amd64-gnu /stage0-amd64-gnu.txz /var/tmp/catalyst/builds/seed/
 COPY --from=stage0-amd64-musl /stage0-amd64-musl.txz /var/tmp/catalyst/builds/seed/
 
-ARG RELENG=656eb9734f2f936fcf136d269cfd0f63442954eb # latest releases/specs/amd64 and releases/portage/stages
-RUN --mount=type=cache,target=/var/cache/distfiles --security=insecure <<-EOS
+ARG RELENG=5299ef14752f8a9b18827e8044ac3817ced14ed1 # latest releases/specs/amd64 and releases/portage/stages
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/catalyst/tmp --security=insecure <<-EOS
 	set -eux
 
 	echo jobs = 3 >> /etc/catalyst/catalyst.conf
@@ -463,7 +464,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles --security=insecure <<-EOS
 
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
 	REPO_DIR=$(pwd)
-	SPECS=( releases/specs/amd64/llvm/* releases/specs/amd64/musl-llvm/* )
+	SPECS=( releases/specs/amd64/{,musl-}llvm/* )
 
 	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-gnu' releases/specs/amd64/llvm/stage1*
 	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-musl' releases/specs/amd64/musl-llvm/stage1*
