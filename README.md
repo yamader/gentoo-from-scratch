@@ -6,8 +6,7 @@
     --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1,env.BUILDKIT_STEP_LOG_MAX_SPEED=-1 \
     --name gentoo-builder \
     --use
-% docker buildx build --allow security.insecure --progress plain -o dist --target target-gnu .
-% docker buildx build --allow security.insecure --progress plain -o dist --target target-musl .
+% docker buildx build --allow security.insecure --progress plain -o dist .
 ```
 
 ## Rust
