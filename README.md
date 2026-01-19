@@ -11,17 +11,17 @@
 
 ## Rust
 
-そのうち自動化する
+todo: そのうち自動化する
 
 ```sh
-USE=mrustc-bootstrap CC=gcc LDFLAGS=-fuse-ld=lld emerge -1 dev-lang/rust:1.74.1
+USE='mrustc-bootstrap system-llvm' emerge -1j dev-lang/rust:1.74.1
 ```
 
-`dev-lang/rust:1.74.1`に当てるpatch💩
+`llvm-core/llvm:17`に当てるpatch💩
 
 ```diff
---- a/src/llvm-project/llvm/tools/sancov/sancov.cpp
-+++ b/src/llvm-project/llvm/tools/sancov/sancov.cpp
+--- a/llvm/tools/sancov/sancov.cpp
++++ b/llvm/tools/sancov/sancov.cpp
 @@ -505,7 +505,7 @@
    static std::unique_ptr<SpecialCaseList> createUserIgnorelist() {
      if (ClIgnorelist.empty())
