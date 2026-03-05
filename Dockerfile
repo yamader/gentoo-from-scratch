@@ -8,10 +8,10 @@ RUN --mount=type=cache,target=/live-bootstrap/distfiles <<-EOS
 	mkdir -p live-bootstrap
 	cd live-bootstrap
 
-	# 2026-01-11
-	wget -O- https://github.com/fosslinux/live-bootstrap/archive/59e5a4341a959971bc58b4a043accd8c5bec8c22.tar.gz \
+	# 2026-02-13
+	wget -O- https://github.com/fosslinux/live-bootstrap/archive/984b832224ed9ea701c38e70cf703c6a2aa33243.tar.gz \
 		| tee >(tar xz --strip-components=1) \
-		| sha256sum -c <(echo f7332c92badbf662a5a5ab08604eaa2bfeca77bb38aee89f85ae7a847ffdc71f -)
+		| sha256sum -c <(echo d2356c5353743b288e3f8a0040082cc2f98923f8edcc95ae0c645ec659fac674 -)
 	wget -O- https://github.com/ironmeld/builder-hex0/archive/a2781242d19e6be891b453d8fa827137ab5db31a.tar.gz \
 		| tee >(tar xzC builder-hex0 --strip-components=1) \
 		| sha256sum -c <(echo cc42c9e40b14505cd79165b49750d54959bbfb21d738fab5e7d5762a98b1d7cb -)
@@ -166,7 +166,7 @@ RUN <<-EOS
 EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
-ARG GENTOO_STAGE0=c929c47f09339eb3bb4ff108ba8ca6a722680d19 # 2026-01-06; latest sys-apps/portage
+ARG GENTOO_STAGE0=9beb91d485ff4f66a69b9a0cf58fd3b866b22eeb # 2026-02-17; latest sys-apps/portage
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
@@ -346,7 +346,7 @@ RUN <<-EOS
 EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
-ARG GENTOO_STAGE0=c929c47f09339eb3bb4ff108ba8ca6a722680d19
+ARG GENTOO_STAGE0=9beb91d485ff4f66a69b9a0cf58fd3b866b22eeb
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
@@ -451,7 +451,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 COPY --from=stage0-amd64-gnu /stage0-amd64-gnu.txz /var/tmp/catalyst/builds/seed/
 COPY --from=stage0-amd64-musl /stage0-amd64-musl.txz /var/tmp/catalyst/builds/seed/
 
-ARG RELENG=5299ef14752f8a9b18827e8044ac3817ced14ed1 # latest releases/specs/amd64 and releases/portage/stages
+ARG RELENG=318e7d56391c10f29858f88305a0c9f8d0d6d32e # latest releases/specs/amd64 and releases/portage/stages
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/catalyst/tmp --security=insecure <<-EOS
 	set -eux
 
