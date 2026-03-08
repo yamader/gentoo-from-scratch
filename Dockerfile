@@ -265,6 +265,11 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	cd ..
 	rm -r portage-$PORTAGE
 
+	# fix systemd
+	sed -i 's/nogroup/nobody/' /etc/group
+	emerge -1j sys-apps/diffutils
+	emerge -1j sys-libs/pam
+
 	# diet
 	echo shadow:x:42: >> /etc/group
 	USE=-* emerge -1Oj \
@@ -282,15 +287,12 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 		/usr/libexec/gcc/i686-unknown-linux-musl
 	emerge -1Oj dev-lang/perl
 EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
+	emerge -uDN -j3 @world
 
 FROM gentoo-gnu AS stage0-amd64-gnu
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
-
-	# fix systemd
-	sed -i 's/nogroup/nobody/' /etc/group
-	emerge -1j sys-apps/diffutils
-	emerge -1j sys-libs/pam
 
 	USE='default-compiler-rt default-libcxx default-lld llvm-libunwind' \
 	emerge -1j --autounmask-continue \
@@ -485,6 +487,8 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 		/usr/libexec/gcc/i686-unknown-linux-musl
 	emerge -1Oj dev-lang/perl
 EOS
+RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
+	emerge -uDN -j3 @world
 
 FROM gentoo-musl AS stage0-amd64-musl
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
