@@ -81,10 +81,12 @@ RUN <<-EOS
 	set -eux
 
 	TARGET=x86_64-pc-linux-gnu
-	BINUTILS=binutils-2.45
+	BINUTILS=binutils-2.46.0
 	GCC=gcc-15.2.0
-	GLIBC=glibc-2.41
+	GLIBC=glibc-2.42 # must \leq gentoo stable
 	WGET=wget-1.25.0
+	MAKE=make-4.4.1
+	FINDUTILS=findutils-4.10.0
 
 	mkdir bootstrap-64
 	cd bootstrap-64
@@ -93,6 +95,8 @@ RUN <<-EOS
 	curl https://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.xz | tar xJ
 	curl https://ftp.gnu.org/gnu/glibc/$GLIBC.tar.xz | tar xJ
 	curl https://ftp.gnu.org/gnu/wget/$WGET.tar.lz | tar xJ
+	curl https://ftp.gnu.org/gnu/make/$MAKE.tar.lz | tar xJ
+	curl https://ftp.gnu.org/gnu/findutils/$FINDUTILS.tar.xz | tar xJ
 
 	# merge-usr for glibc
 	ln -s usr/lib64 /
@@ -154,6 +158,18 @@ RUN <<-EOS
 	make -j$(nproc) install
 	cd -
 
+	# fix make -j in portage
+	cd $MAKE
+	./configure --prefix=/usr --host=$TARGET
+	make -j$(nproc) install
+	cd -
+
+	# >=findutils-4.9.0 for >=portage-3.0.70
+	cd $FINDUTILS
+	./configure --prefix=/usr --host=$TARGET
+	make -j$(nproc) install
+	cd -
+
 	cd ..
 	rm -r bootstrap-64
 
@@ -163,6 +179,13 @@ RUN <<-EOS
 
 	# for coreutils
 	rm /usr/include/stropts.h
+
+	# for >=portage-3.0.69.3
+	ln -s tar /usr/bin/gtar
+
+	# for muon
+	ln -sf /usr/local/bin/$TARGET-gcc /usr/bin/cc
+	ln -s cc /usr/bin/c99
 EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
@@ -170,8 +193,7 @@ ARG GENTOO_STAGE0=9beb91d485ff4f66a69b9a0cf58fd3b866b22eeb # 2026-02-17; latest 
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
-	# portage-3.0.70: find: invalid predicate `-files0-from'
-	PORTAGE=portage-3.0.69.3
+	PORTAGE=portage-3.0.77
 
 	mkdir -p /etc/portage /var/db/repos/gentoo
 	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_STAGE0.tar.gz | tar xzC /var/db/repos/gentoo --strip-components=1
@@ -184,15 +206,27 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	cp -r cnf /usr/share/portage/config
 	useradd portage
 
-	# for portage
-	ln -s tar /usr/bin/gtar
+	# meson for >=gentoo-functions-1
+	curl -L https://github.com/muon-build/muon/archive/0.5.0.tar.gz | tar xz
+	cd muon-0.5.0
+	./bootstrap.sh build
+	build/muon-bootstrap setup build
+	build/muon-bootstrap -C build samu
+	mv build/muon /usr/bin/muon
+	ln -s muon /usr/bin/meson
+	echo -e '#!/bin/sh\nexec muon samu' > /usr/bin/ninja
+	chmod +x /usr/bin/ninja
+	cd -
 
-	# fix make; live-bootstrap's is not usable with -jN
-	MAKEOPTS=-j1 ./bin/emerge -1O \
-		app-portage/elt-patches \
+	# meson-format-array for meson.eclass
+	USE=python_targets_python3_11 ./bin/emerge -1O meson-format-array
+	echo -e '#!/bin/sh\n/usr/lib/python-exec/python3.11/$(basename $0)' > /usr/lib/python-exec/python-exec2
+	chmod +x /usr/lib/python-exec/python-exec2
+
+	# fix portage
+	USE=-* ./bin/emerge -1O \
 		sys-apps/gentoo-functions \
-		app-arch/xz-utils \
-		dev-build/make
+		app-portage/elt-patches
 
 	# fix toolchain
 	USE=-* ./bin/emerge -1O \
@@ -228,7 +262,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 
 	./bin/emerge -1j sys-apps/portage
 
-	cd -
+	cd ..
 	rm -r portage-$PORTAGE
 
 	# diet
@@ -283,10 +317,12 @@ RUN <<-EOS
 	set -eux
 
 	TARGET=x86_64-pc-linux-musl
-	BINUTILS=binutils-2.45
+	BINUTILS=binutils-2.46.0
 	GCC=gcc-15.2.0
 	MUSL=musl-1.2.5
 	WGET=wget-1.25.0
+	MAKE=make-4.4.1
+	FINDUTILS=findutils-4.10.0
 
 	mkdir bootstrap-64
 	cd bootstrap-64
@@ -295,6 +331,8 @@ RUN <<-EOS
 	curl https://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.xz | tar xJ
 	curl https://musl.libc.org/releases/$MUSL.tar.gz | tar xz
 	curl https://ftp.gnu.org/gnu/wget/$WGET.tar.lz | tar xJ
+	curl https://ftp.gnu.org/gnu/make/$MAKE.tar.lz | tar xJ
+	curl https://ftp.gnu.org/gnu/findutils/$FINDUTILS.tar.xz | tar xJ
 
 	cd $WGET
 	./configure --prefix=/usr --with-ssl=openssl --with-libssl-prefix=/usr/ssl
@@ -341,8 +379,25 @@ RUN <<-EOS
 	make -j$(nproc) install
 	cd -
 
+	cd $MAKE
+	# fix make
+	curl -L https://github.com/gentoo/gentoo/raw/945e301/dev-build/make/files/make-4.4.1-c23.patch | patch -p1
+	./configure --prefix=/usr --host=$TARGET
+	make -j$(nproc) install
+	cd -
+
+	cd $FINDUTILS
+	./configure --prefix=/usr --host=$TARGET
+	make -j$(nproc) install
+	cd -
+
 	cd ..
 	rm -r bootstrap-64
+
+	ln -s tar /usr/bin/gtar
+
+	ln -sf /usr/local/bin/$TARGET-gcc /usr/bin/cc
+	ln -s cc /usr/bin/c99
 EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
@@ -350,7 +405,7 @@ ARG GENTOO_STAGE0=9beb91d485ff4f66a69b9a0cf58fd3b866b22eeb
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
-	PORTAGE=portage-3.0.69.3
+	PORTAGE=portage-3.0.77
 
 	mkdir -p /etc/portage /var/db/repos/gentoo
 	curl -L https://github.com/gentoo/gentoo/archive/$GENTOO_STAGE0.tar.gz | tar xzC /var/db/repos/gentoo --strip-components=1
@@ -363,13 +418,24 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	cp -r cnf /usr/share/portage/config
 	useradd portage
 
-	ln -s tar /usr/bin/gtar
+	curl -L https://github.com/muon-build/muon/archive/0.5.0.tar.gz | tar xz
+	cd muon-0.5.0
+	./bootstrap.sh build
+	build/muon-bootstrap setup build
+	build/muon-bootstrap -C build samu
+	mv build/muon /usr/bin/muon
+	ln -s muon /usr/bin/meson
+	echo -e '#!/bin/sh\nexec muon samu' > /usr/bin/ninja
+	chmod +x /usr/bin/ninja
+	cd -
 
-	MAKEOPTS=-j1 ./bin/emerge -1O \
-		app-portage/elt-patches \
+	USE=python_targets_python3_11 ./bin/emerge -1O meson-format-array
+	echo -e '#!/bin/sh\n/usr/lib/python-exec/python3.11/$(basename $0)' > /usr/lib/python-exec/python-exec2
+	chmod +x /usr/lib/python-exec/python-exec2
+
+	USE=-* ./bin/emerge -1O \
 		sys-apps/gentoo-functions \
-		app-arch/xz-utils \
-		dev-build/make
+		app-portage/elt-patches
 
 	USE=-* ./bin/emerge -1O \
 		sys-libs/zlib \
@@ -400,7 +466,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 
 	./bin/emerge -1j sys-apps/portage
 
-	cd -
+	cd ..
 	rm -r portage-$PORTAGE
 
 	echo shadow:x:42: >> /etc/group
