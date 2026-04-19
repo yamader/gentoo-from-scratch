@@ -288,7 +288,7 @@ EOS
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
 	emerge -uDN -j3 @world
 
-FROM gentoo-gnu AS stage0-amd64-gnu
+FROM gentoo-gnu AS stage0-amd64-llvm
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
@@ -302,7 +302,9 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 		llvm-runtimes/libcxxabi \
 		llvm-runtimes/libunwind
 
-	tar cJf /stage0-amd64-gnu.txz \
+	CXX=clang++ emerge -1Oq dev-libs/jsoncpp dev-build/cmake
+
+	tar cJf /stage0-amd64-llvm.txz \
 		--exclude /dev \
 		--exclude /proc \
 		--exclude /sys \
@@ -490,7 +492,7 @@ EOS
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
 	emerge -uDN -j3 @world
 
-FROM gentoo-musl AS stage0-amd64-musl
+FROM gentoo-musl AS stage0-amd64-musl-llvm
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage <<-EOS
 	set -eux
 
@@ -504,7 +506,9 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 		llvm-runtimes/libcxxabi \
 		llvm-runtimes/libunwind
 
-	tar cJf /stage0-amd64-musl.txz \
+	CXX=clang++ emerge -1Oq dev-libs/jsoncpp dev-build/cmake
+
+	tar cJf /stage0-amd64-musl-llvm.txz \
 		--exclude /dev \
 		--exclude /proc \
 		--exclude /sys \
@@ -518,8 +522,8 @@ FROM gentoo-gnu AS catalyst
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
 	emerge -j --autounmask --autounmask-continue dev-util/catalyst
 
-COPY --from=stage0-amd64-gnu /stage0-amd64-gnu.txz /var/tmp/catalyst/builds/seed/
-COPY --from=stage0-amd64-musl /stage0-amd64-musl.txz /var/tmp/catalyst/builds/seed/
+COPY --from=stage0-amd64-llvm /stage0-amd64-llvm.txz /var/tmp/catalyst/builds/seed/
+COPY --from=stage0-amd64-musl-llvm /stage0-amd64-musl-llvm.txz /var/tmp/catalyst/builds/seed/
 
 ARG RELENG=759b2ae92949135bca28eb3132eb3060b9c0f708 # latest releases/specs/amd64 and releases/portage/stages
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/catalyst/tmp --security=insecure <<-EOS
@@ -534,10 +538,10 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 
 	TREEISH=$(git -C /var/tmp/catalyst/repos/gentoo.git rev-parse stable)
 	REPO_DIR=$(pwd)
-	SPECS=( releases/specs/amd64/{,musl-}llvm/* )
+	SPECS=( releases/specs/amd64/{,musl-}llvm/*.spec )
 
-	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-gnu' releases/specs/amd64/llvm/stage1*
-	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-musl' releases/specs/amd64/musl-llvm/stage1*
+	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-llvm' releases/specs/amd64/llvm/stage1*
+	sed -i '/source_subpath:/c source_subpath: seed/stage0-amd64-musl-llvm' releases/specs/amd64/musl-llvm/stage1*
 	sed -i "
 		s|@TIMESTAMP@|$(date -u +%Y%m%dT%H%M%SZ)|g
 		s|@TREEISH@|$TREEISH|g
