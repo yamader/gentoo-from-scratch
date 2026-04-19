@@ -173,19 +173,19 @@ RUN <<-EOS
 	cd ..
 	rm -r bootstrap-64
 
-	# for gcc
+	# fix gcc
 	ln -s /lib64/libm.so.6 /usr/local/$TARGET/lib64
 	ln -s /usr/local/bin/$TARGET-cpp /lib/cpp
 
-	# for coreutils
+	# fix coreutils
 	rm /usr/include/stropts.h
 
-	# for >=portage-3.0.69.3
+	# fix >=portage-3.0.69.3
 	ln -s tar /usr/bin/gtar
 
-	# for muon
-	ln -sf /usr/local/bin/$TARGET-gcc /usr/bin/cc
-	ln -s cc /usr/bin/c99
+	# fix muon
+	ln -sf ../local/bin/$TARGET-gcc /usr/bin/cc
+	ln -sf ../local/bin/$TARGET-gcc /usr/bin/c99
 EOS
 
 FROM x86_64-pc-linux-gnu AS gentoo-gnu
@@ -206,7 +206,7 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	cp -r cnf /usr/share/portage/config
 	useradd portage
 
-	# meson for >=gentoo-functions-1
+	# muon(meson) for >=gentoo-functions-1
 	curl -L https://github.com/muon-build/muon/archive/0.5.0.tar.gz | tar xz
 	cd muon-0.5.0
 	./bootstrap.sh build
@@ -214,22 +214,22 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	build/muon-bootstrap -C build samu
 	mv build/muon /usr/bin/muon
 	ln -s muon /usr/bin/meson
-	echo -e '#!/bin/sh\nexec muon samu' > /usr/bin/ninja
+	echo -e '#!/bin/sh\nmuon samu' > /usr/bin/ninja
 	chmod +x /usr/bin/ninja
 	cd -
 
 	# meson-format-array for meson.eclass
-	USE=python_targets_python3_11 ./bin/emerge -1O meson-format-array
+	USE=python_targets_python3_11 ./bin/emerge -1Oq meson-format-array
 	echo -e '#!/bin/sh\n/usr/lib/python-exec/python3.11/$(basename $0)' > /usr/lib/python-exec/python-exec2
 	chmod +x /usr/lib/python-exec/python-exec2
 
 	# fix portage
-	USE=-* ./bin/emerge -1O \
+	USE=-* ./bin/emerge -1Oq \
 		sys-apps/gentoo-functions \
 		app-portage/elt-patches
 
 	# fix toolchain
-	USE=-* ./bin/emerge -1O \
+	USE=-* ./bin/emerge -1Oq \
 		sys-libs/zlib \
 		sys-devel/binutils-config \
 		sys-devel/binutils \
@@ -267,8 +267,6 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 
 	# fix systemd
 	sed -i 's/nogroup/nobody/' /etc/group
-	emerge -1j sys-apps/diffutils
-	emerge -1j sys-libs/pam
 
 	# diet
 	echo shadow:x:42: >> /etc/group
@@ -398,8 +396,8 @@ RUN <<-EOS
 
 	ln -s tar /usr/bin/gtar
 
-	ln -sf /usr/local/bin/$TARGET-gcc /usr/bin/cc
-	ln -s cc /usr/bin/c99
+	ln -sf ../local/bin/$TARGET-gcc /usr/bin/cc
+	ln -sf ../local/bin/$TARGET-gcc /usr/bin/c99
 EOS
 
 FROM x86_64-pc-linux-musl AS gentoo-musl
@@ -427,19 +425,19 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 	build/muon-bootstrap -C build samu
 	mv build/muon /usr/bin/muon
 	ln -s muon /usr/bin/meson
-	echo -e '#!/bin/sh\nexec muon samu' > /usr/bin/ninja
+	echo -e '#!/bin/sh\nmuon samu' > /usr/bin/ninja
 	chmod +x /usr/bin/ninja
 	cd -
 
-	USE=python_targets_python3_11 ./bin/emerge -1O meson-format-array
+	USE=python_targets_python3_11 ./bin/emerge -1Oq meson-format-array
 	echo -e '#!/bin/sh\n/usr/lib/python-exec/python3.11/$(basename $0)' > /usr/lib/python-exec/python-exec2
 	chmod +x /usr/lib/python-exec/python-exec2
 
-	USE=-* ./bin/emerge -1O \
+	USE=-* ./bin/emerge -1Oq \
 		sys-apps/gentoo-functions \
 		app-portage/elt-patches
 
-	USE=-* ./bin/emerge -1O \
+	USE=-* ./bin/emerge -1Oq \
 		sys-libs/zlib \
 		sys-devel/binutils-config \
 		sys-devel/binutils \
@@ -470,6 +468,8 @@ RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/va
 
 	cd ..
 	rm -r portage-$PORTAGE
+
+	sed -i 's/nogroup/nobody/' /etc/group
 
 	echo shadow:x:42: >> /etc/group
 	USE=-* emerge -1Oj \
@@ -516,7 +516,7 @@ EOS
 
 FROM gentoo-gnu AS catalyst
 RUN --mount=type=cache,target=/var/cache/distfiles --mount=type=tmpfs,target=/var/tmp/portage \
-	emerge -j --autounmask --autounmask-continue dev-util/catalyst sys-apps/which
+	emerge -j --autounmask --autounmask-continue dev-util/catalyst
 
 COPY --from=stage0-amd64-gnu /stage0-amd64-gnu.txz /var/tmp/catalyst/builds/seed/
 COPY --from=stage0-amd64-musl /stage0-amd64-musl.txz /var/tmp/catalyst/builds/seed/
